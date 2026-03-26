@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Kidney Disease Classification</title>
+    <!-- Simple Medical Icon -->
+	<link rel="shortcut icon" href="https://cdn-icons-png.flaticon.com/512/2862/2862873.png" />
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+	<style>
+		body { background-color: #eff2f9; }
+		.iupload h3 { color: #1b2d6b; font-size: 30px; font-weight: 700; }
+		.img-part { height: 300px; width: 300px; margin: 0px auto; }
+		.image-part { height: 300px; width: 300px; border: 1px solid #1b2d6b; display: flex; justify-content: center; align-items: center; background-color: #fff; overflow: hidden; }
+		.image-part img { max-height: 100%; max-width: 100%; display: none; padding: 5px; }
+		.image-part #video { display: block; height: 300px; width: 300px; padding: 5px; object-fit: cover; }
+		.res-part { border: 1px solid #dedede; margin-left: 20px; height: 310px; width: 100%; padding: 15px; margin: 0px auto; overflow: auto; background-color: #fff; display: flex; align-items: center; justify-content: center; }
+		.jsonRes { font-size: 24px; font-weight: bold; color: #28a745; text-align: center; }
+		#send { cursor: pointer; }
+		.btn-part { width: 325px; margin-top: 15px; }
+		#loading { position: fixed; left: 0px; top: 0px; width: 100%; height: 100%; z-index: 9999999999; overflow: hidden; background: rgba(255, 255, 255, 0.7); display: none; }
+		.loader { border: 8px solid #f3f3f3; border-top: 8px solid #363e75; border-radius: 50%; width: 60px; height: 60px; left: 50%; margin-left: -4em; display: block; animation: spin 1s linear infinite; position: absolute; top: 50%; margin-top: -4.05em; }
+		@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+		.right-part { border: 1px solid #dedede; padding: 15px; background-color: #fff; border-radius: 5px; }
+	</style>
+</head>
+<body>
+    <div class="main container mt-5">
+		<section class="iupload">
+			<h3 class="text-center py-4">Kidney CT Scan Classification</h3>
+            <p class="text-center text-muted mb-4">Upload a CT scan image to detect Normal, Cyst, Tumor, or Stone.</p>
+			
+            <div class="row mt-4">
+				<div class="col-md-6 mb-4">
+					<div class="img-part">
+						<div class="image-part">
+                            <!-- Placeholder image for kidney CT scans -->
+							<img src="https://media.sciencephoto.com/png/f0170068-800px-wm.png" id="video" alt="Upload Placeholder">
+							<img src="" id="photo" alt="Uploaded Image">
+							<canvas style="display:none;" id="canvas"></canvas>
+						</div>
+						<div class="btn-part mx-auto">
+							<form id="upload-data" class="">
+								<div class="input-group mt-3 row justify-content-center">
+									<button type="button" class="btn btn-primary col-md-5 col-xs-5 mr-2" id="uload">Upload CT Scan</button>
+									<button id="send" type="button" class="btn btn-success col-md-5 col-xs-5">Predict</button>
+								</div>
+								
+                                <!-- Ensure the URL points correctly to the /predict route in your app.py -->
+								<input type="hidden" class="form-control" id="url" value="/predict"/>
+								<input name="upload" type="file" id="fileinput" accept="image/*" style="display:none;"/><br/>
+							</form>
+						</div>
+					</div>
+				</div>
+				<div class="col-md-6 col-xs-12">
+                    <div class="right-part h-100">
+					    <h5 class="mb-4 text-center border-bottom pb-2">Prediction Results</h5>
+					    <div class="res-part shadow-sm">
+                            <div class="jsonRes" id="result-display">Awaiting image upload...</div>
+                        </div>
+                    </div>
+				</div>
+			</div>
+		</section>
+	</div>
+
+<div id="loading"><div class="loader"></div></div>
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js" integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q" crossorigin="anonymous"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
+
+<script>
+var base_data = "";
+
+function sendRequest(base64Data){
+	if(base64Data != "" && base64Data != null){
+        var url = $("#url").val();
+        $("#loading").show();
+        
+        $.ajax({
+            url : url,
+            type: "POST",
+            cache: false,
+            async: true,
+            crossDomain: true,
+            headers: {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin':'*'
+            },
+            data: JSON.stringify({image: base64Data}),
+            success: function(res){
+                $("#loading").hide();
+                try {
+                    // Extracting the predicted class directly from the dictionary returned by app.py
+                    var predictionLabel = res[0].image; 
+                    
+                    // Displaying result with color coding based on severity
+                    var color = "#28a745"; // Default green for Normal
+                    if(predictionLabel === "Tumor") color = "#dc3545"; // Red
+                    else if(predictionLabel === "Stone" || predictionLabel === "Cyst") color = "#ffc107"; // Yellow/Warning
+
+                    $("#result-display").html(`<span style="color: ${color}; font-size: 32px;">${predictionLabel}</span>`);
+                } catch(e) {
+                    $("#result-display").html("<span style='color: red;'>Error processing result</span>");
+                }
+            },
+            error: function(err) {
+                $("#loading").hide();
+                $("#result-display").html("<span style='color: red;'>Server Error</span>");
+            }
+        });
+	} else {
+        alert("Please upload an image first!");
+    }
+}
+
+$(document).ready(function(){
+	$('#send').click(function(evt){
+		sendRequest(base_data);
+    });
+
+    $('#uload').click(function(evt) {
+        $('#fileinput').trigger('click');
+    });
+
+	$("#fileinput").change(function(){
+		if (this.files && this.files[0]){
+			var reader = new FileReader();
+			reader.onload = function (e){
+				var url = e.target.result;
+				var img = new Image();
+				img.crossOrigin = 'Anonymous';
+				img.onload = function(){
+					var canvas = document.createElement('CANVAS');
+					var ctx = canvas.getContext('2d');
+					canvas.height = this.height;
+					canvas.width = this.width;
+					ctx.drawImage(this, 0, 0);
+                    // Standardizing base64 extraction
+					base_data = canvas.toDataURL('image/jpeg', 1.0).replace(/^data:image\/[a-z]+;base64,/, '');
+					canvas = null;
+				};
+				img.src = url;
+				$('#photo').attr('src', url);
+				$('#photo').show();
+				$('#video').hide();
+                $("#result-display").text("Ready to predict...");
+			}
+			reader.readAsDataURL(this.files[0]);
+		}
+	});
+});
+</script>
+</body>
+</html>

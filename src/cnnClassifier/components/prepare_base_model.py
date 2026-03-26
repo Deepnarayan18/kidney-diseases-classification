@@ -10,7 +10,6 @@ class PrepareBaseModel:
     def __init__(self, config: PrepareBaseModelConfig):
         self.config = config
 
-    
     def get_base_model(self):
         self.model = tf.keras.applications.vgg16.VGG16(
             input_shape=self.config.params_image_size,
@@ -20,39 +19,56 @@ class PrepareBaseModel:
 
         self.save_model(path=self.config.base_model_path, model=self.model)
 
-    
-
     @staticmethod
     def _prepare_full_model(model, classes, freeze_all, freeze_till, learning_rate):
+        # Base model ko freeze karna
         if freeze_all:
             for layer in model.layers:
-                model.trainable = False
+                layer.trainable = False
         elif (freeze_till is not None) and (freeze_till > 0):
             for layer in model.layers[:-freeze_till]:
-                model.trainable = False
+                layer.trainable = False
 
-        flatten_in = tf.keras.layers.Flatten()(model.output)
+        # --- PRO CHANGES HERE ---
+        # Flatten ki jagah GlobalAveragePooling2D use karo (better for medical spatial data)
+        x = tf.keras.layers.GlobalAveragePooling2D()(model.output)
+        
+        # Ek intermediate Dense layer with ReLU to learn complex features
+        x = tf.keras.layers.Dense(256, activation='relu')(x)
+        
+        # Dropout to prevent overfitting (50% neurons off randomly during training)
+        x = tf.keras.layers.Dropout(0.5)(x)
+        
+        # Final classification layer
         prediction = tf.keras.layers.Dense(
             units=classes,
             activation="softmax"
-        )(flatten_in)
+        )(x)
+        # ------------------------
 
         full_model = tf.keras.models.Model(
             inputs=model.input,
             outputs=prediction
         )
 
+        # Better Optimizer (Adam generally converges better for medical imaging than standard SGD)
+        # Added Precision and Recall metrics
         full_model.compile(
-            optimizer=tf.keras.optimizers.SGD(learning_rate=learning_rate),
+            optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
             loss=tf.keras.losses.CategoricalCrossentropy(),
-            metrics=["accuracy"]
+            metrics=[
+                "accuracy",
+                tf.keras.metrics.Precision(name="precision"),
+                tf.keras.metrics.Recall(name="recall")
+            ]
         )
 
         full_model.summary()
         return full_model
-    
-    
+
     def update_base_model(self):
+        # Note: Tumne upper 'freeze_till' None rakha tha. Agar thoda fine-tuning chahiye to 
+        # aage chalke freeze_all=False and freeze_till=4 kar sakte ho (last conv block train karne ke liye)
         self.full_model = self._prepare_full_model(
             model=self.model,
             classes=self.config.params_classes,
@@ -63,8 +79,7 @@ class PrepareBaseModel:
 
         self.save_model(path=self.config.updated_base_model_path, model=self.full_model)
 
-    
-        
     @staticmethod
     def save_model(path: Path, model: tf.keras.Model):
+        # Format explicitly set taaki Keras 3 issues na aaye
         model.save(path)

@@ -1,6 +1,7 @@
 from cnnClassifier.constants import *
 import os
-from cnnClassifier.utils.common import read_yaml, create_directories,save_json
+from pathlib import Path
+from cnnClassifier.utils.common import read_yaml, create_directories, save_json
 from cnnClassifier.entity.config_entity import (DataIngestionConfig,
                                                 PrepareBaseModelConfig,
                                                 TrainingConfig,
@@ -18,25 +19,20 @@ class ConfigurationManager:
 
         create_directories([self.config.artifacts_root])
 
-
-    
     def get_data_ingestion_config(self) -> DataIngestionConfig:
         config = self.config.data_ingestion
 
         create_directories([config.root_dir])
 
         data_ingestion_config = DataIngestionConfig(
-            root_dir=config.root_dir,
+            root_dir=Path(config.root_dir), # Changed to Path object
             source_URL=config.source_URL,
-            local_data_file=config.local_data_file,
-            unzip_dir=config.unzip_dir 
+            local_data_file=Path(config.local_data_file), # Changed to Path object
+            unzip_dir=Path(config.unzip_dir) # Changed to Path object
         )
 
         return data_ingestion_config
-    
 
-
-    
     def get_prepare_base_model_config(self) -> PrepareBaseModelConfig:
         config = self.config.prepare_base_model
         
@@ -54,15 +50,14 @@ class ConfigurationManager:
         )
 
         return prepare_base_model_config
-    
-
 
 
     def get_training_config(self) -> TrainingConfig:
         training = self.config.training
         prepare_base_model = self.config.prepare_base_model
         params = self.params
-        training_data = os.path.join(self.config.data_ingestion.unzip_dir, "kidney-ct-scan-image")
+        training_data = os.path.join(self.config.data_ingestion.unzip_dir, "CT-KIDNEY-DATASET-Normal-Cyst-Tumor-Stone") # Ensured exact folder name from previous context
+        
         create_directories([
             Path(training.root_dir)
         ])
@@ -82,14 +77,14 @@ class ConfigurationManager:
     
     
     def get_evaluation_config(self) -> EvaluationConfig:
+        # Changed strings to Path objects to avoid OS specific path issues
+        # Also ensured that the folder name perfectly matches the unzip directory structure
         eval_config = EvaluationConfig(
-            path_of_model="artifacts/training/model.keras",
-            training_data="artifacts/data_ingestion/kidney-ct-scan-image",
+            path_of_model=Path("artifacts/training/model.keras"), 
+            training_data=Path("artifacts/data_ingestion/CT-KIDNEY-DATASET-Normal-Cyst-Tumor-Stone"),
             mlflow_uri="https://dagshub.com/Deepnarayan18/kidney-diseases-classification.mlflow",
             all_params=self.params,
             params_image_size=self.params.IMAGE_SIZE,
             params_batch_size=self.params.BATCH_SIZE
         )
         return eval_config
-
-    
