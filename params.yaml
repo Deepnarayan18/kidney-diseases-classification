@@ -9,4 +9,4 @@ INCLUDE_TOP: False
 EPOCHS: 50                  
 CLASSES: 4                  
 WEIGHTS: imagenet           
-LEARNING_RATE: 0.0001  
+LEARNING_RATE: 0.00001 

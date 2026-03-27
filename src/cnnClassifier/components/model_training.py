@@ -85,7 +85,7 @@ class Training:
         self.validation_steps = self.valid_generator.samples // self.valid_generator.batch_size
 
         # --- PRO CHANGE 3: Advanced Callbacks ---
-        # Training ko best epoch par rokne aur LR ko adjust karne ke liye
+        # Fine-tuning ke liye callbacks ko thoda relax kiya gaya hai
         
         # 1. Model Checkpoint: Hamesha best validation recall wala model save karo
         checkpoint = tf.keras.callbacks.ModelCheckpoint(
@@ -96,22 +96,24 @@ class Training:
             verbose=1
         )
 
-        # 2. Early Stopping: Agar 7 epochs tak recall nahi badhta to training rok do
+        # 2. Early Stopping: Patience ko 7 se badhakar 10 kiya gaya hai
+        # Fine tuning me validation curve thoda upar niche hota hai, usko jaldi nahi rokna
         early_stopping = tf.keras.callbacks.EarlyStopping(
             monitor="val_recall",
             mode="max",
-            patience=7,
+            patience=10,         # UPDATE: Patience increased
             restore_best_weights=True,
             verbose=1
         )
 
         # 3. Reduce LR on Plateau: Agar validation loss ruk jaye to Learning Rate aur kam kardo
+        # Fine tuning me LR drop factor 0.3 se 0.5 kiya (thoda gently decrease karega)
         reduce_lr = tf.keras.callbacks.ReduceLROnPlateau(
             monitor="val_loss",
-            factor=0.3,
-            patience=3,
+            factor=0.5,          # UPDATE: Changed to 0.5
+            patience=4,          # UPDATE: Changed to 4
             verbose=1,
-            min_lr=1e-6
+            min_lr=1e-7          # UPDATE: Min LR pushed lower for micro-adjustments
         )
 
         callbacks_list = [checkpoint, early_stopping, reduce_lr]
@@ -126,6 +128,3 @@ class Training:
             callbacks=callbacks_list,
             class_weight=self.class_weights
         )
-        
-        # Checkpoint khud best model save kar dega, par in case last epoch model save karna ho
-        # humne save_model ko pehle hi checkpoint me handle kar liya hai.

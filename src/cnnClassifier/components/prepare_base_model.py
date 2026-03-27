@@ -5,7 +5,6 @@ import tensorflow as tf
 from pathlib import Path
 from cnnClassifier.entity.config_entity import PrepareBaseModelConfig
 
-
 class PrepareBaseModel:
     def __init__(self, config: PrepareBaseModelConfig):
         self.config = config
@@ -21,13 +20,17 @@ class PrepareBaseModel:
 
     @staticmethod
     def _prepare_full_model(model, classes, freeze_all, freeze_till, learning_rate):
-        # Base model ko freeze karna
+        # Base model layers ko configure karna
         if freeze_all:
             for layer in model.layers:
                 layer.trainable = False
         elif (freeze_till is not None) and (freeze_till > 0):
-            for layer in model.layers[:-freeze_till]:
+            # Starting ki layers ko freeze karo (general features like edges/textures)
+            for layer in model.layers[:freeze_till]:
                 layer.trainable = False
+            # Aakhri ki layers ko unfreeze rakho (taaki ye kidney-specific tumor/cyst seekh sake)
+            for layer in model.layers[freeze_till:]:
+                layer.trainable = True
 
         # --- PRO CHANGES HERE ---
         # Flatten ki jagah GlobalAveragePooling2D use karo (better for medical spatial data)
@@ -67,13 +70,15 @@ class PrepareBaseModel:
         return full_model
 
     def update_base_model(self):
-        # Note: Tumne upper 'freeze_till' None rakha tha. Agar thoda fine-tuning chahiye to 
-        # aage chalke freeze_all=False and freeze_till=4 kar sakte ho (last conv block train karne ke liye)
+        # --- FINE TUNING LOGIC UPDATE ---
+        # Ab hum 'freeze_all=False' bhej rahe hain
+        # 'freeze_till=15' ka matlab VGG16 ke total 19 layers me se, pehle 15 freeze rahenge
+        # aur aakhri block (block5_conv1, conv2, conv3) train hoga.
         self.full_model = self._prepare_full_model(
             model=self.model,
             classes=self.config.params_classes,
-            freeze_all=True,
-            freeze_till=None,
+            freeze_all=False, 
+            freeze_till=15, 
             learning_rate=self.config.params_learning_rate
         )
 
